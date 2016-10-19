@@ -1,4 +1,4 @@
-This README file contains information on the contents of the
+This README.md file contains information on the contents of the
 readonly-rootfs-overlay layer.
 
 Please see the corresponding sections below for details.
@@ -7,13 +7,16 @@ Please see the corresponding sections below for details.
 
 This layer depends on:
 
+```
   URI: git://git.openembedded.org/bitbake
-  branch: master
+  branch: krogoth
+```
 
+```
   URI: git://git.openembedded.org/openembedded-core
   layers: meta
-  branch: master
-
+  branch: krogoth
+```
 
 # Patches
 
@@ -23,9 +26,9 @@ request.
 
 # Table of Contents
 
-  I. Adding the readonly-rootfs-overlay layer to your build
- II. Read-only root filesystem
-III. Kernel command line parameters
+  I. Adding the readonly-rootfs-overlay layer to your build  
+ II. Read-only root filesystem  
+III. Kernel command line parameters  
 
 
 ## I. Adding the readonly-rootfs-overlay layer to your build
@@ -38,13 +41,14 @@ yocto build tree, you can add it to the build system by adding the
 location of the readonly-rootfs-overlay layer to bblayers.conf, along with any
 other layers needed. e.g.:
 
+```
   BBLAYERS ?= " \
     /path/to/yocto/meta \
     /path/to/yocto/meta-poky \
     /path/to/yocto/meta-yocto-bsp \
     /path/to/yocto/meta-readonly-rootfs-overlay \
     "
-
+```
 
 ## II. Read-only root filesystem
 
