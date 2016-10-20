@@ -26,12 +26,12 @@ request.
 
 # Table of Contents
 
-  I. Adding the readonly-rootfs-overlay layer to your build  
- II. Read-only root filesystem  
-III. Kernel command line parameters  
+1. [Adding the readonly-rootfs-overlay layer to your build](#adding-the-readonly-rootfs-overlay-layer-to-your-build)
+1. [Read-only root filesystem](#read-only-root-filesystem)
+1. [Kernel command line parameters](#kernel-command-line-parameters)
 
 
-## I. Adding the readonly-rootfs-overlay layer to your build
+## Adding the readonly-rootfs-overlay layer to your build
 
 In order to use this layer, you need to make the build system aware of
 it.
@@ -50,12 +50,12 @@ other layers needed. e.g.:
     "
 ```
 
-## II. Read-only root filesystem
+## Read-only root filesystem
 
 If you use this layer you do *not* need to set `read-only-rootfs` in the
 `IMAGE_FEATURES` or `EXTRA_IMAGE_FEATURES` variable.
 
-## III. Kernel command line parameters
+## Kernel command line parameters
 
 Example:
 
