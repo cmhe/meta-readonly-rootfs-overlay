@@ -60,16 +60,20 @@ If you use this layer you do *not* need to set `read-only-rootfs` in the
 Example:
 
 ```
-root=/dev/vda rootfstype=ext4 rootrw=/dev/vdb rootrwfstype=btrfs
+root=/dev/sda1 rootfstype=ext4 rootrw=/dev/sda2 rootrwfstype=btrfs
 ```
 
-`root=` specifies the read-only root filesystem device. (required)
+`root=` specifies the read-only root filesystem device. If this is not
+specified, the current rootfs is used.
 
 `rootfstype=` if support for the-read only filesystem is not build into the
 kernel, you can specifiy the required module name here.
 
-`rootrw=` specifies the read-write root filesystem device. If this is not
+`rootrw=` specifies the read-write filesystem device. If this is not
 specified, `tmpfs` is used.
 
-`rootrwfstype=`  if support for the read-write filesystem is not build into the
+`rootrwfstype=` if support for the read-write filesystem is not build into the
 kernel, you can specifiy the required module name here.
+
+`rootrwreset=` set to `yes` if you want to delete all the files in the
+read-write filesystem prior to building the overlay root files system.

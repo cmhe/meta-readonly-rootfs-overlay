@@ -1,13 +1,21 @@
 #!/bin/sh
 
+# Enable strict shell mode
+set -euo pipefail
+
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
 
-ROOT_MOUNT="/rootfs"
 MOUNT="/bin/mount"
 UMOUNT="/bin/umount"
-ROOT_RWDEVICE="tmpfs"
-ROOT_ROMOUNT="/rfs/ro"
-ROOT_RWMOUNT="/rfs/rw"
+
+INIT="/sbin/init"
+
+ROOT_MOUNT="/mnt"
+ROOT_RODEVICE=""
+ROOT_RWDEVICE=""
+ROOT_ROMOUNT="/media/rfs/ro"
+ROOT_RWMOUNT="/media/rfs/rw"
+ROOT_RWRESET="no"
 
 # Copied from initramfs-framework. The core of this script probably should be
 # turned into initramfs-framework modules to reduce duplication.
@@ -33,9 +41,6 @@ early_setup() {
     $MOUNT -t sysfs sysfs /sys
     $MOUNT -t devtmpfs none /dev
 
-    # support modular kernel
-    modprobe isofs 2> /dev/null
-
     mkdir -p /run
     mkdir -p /var/run
 
@@ -44,24 +49,28 @@ early_setup() {
 }
 
 read_args() {
-    [ -z "$CMDLINE" ] && CMDLINE=`cat /proc/cmdline`
+    [ -z "${CMDLINE+x}" ] && CMDLINE=`cat /proc/cmdline`
     for arg in $CMDLINE; do
         optarg=`expr "x$arg" : 'x[^=]*=\(.*\)'`
         case $arg in
             root=*)
-                ROOT_DEVICE=$optarg ;;
+                ROOT_RODEVICE=$optarg ;;
             rootfstype=*)
                 modprobe $optarg 2> /dev/null ;;
             rootrw=*)
                 ROOT_RWDEVICE=$optarg ;;
             rootrwfstype=*)
                 modprobe $optarg 2> /dev/null ;;
+            rootrwreset=*)
+                ROOT_RWRESET=$optarg ;;
             video=*)
                 video_mode=$arg ;;
             vga=*)
                 vga_mode=$arg ;;
+            init=*)
+                INIT=$optarg ;;
             console=*)
-                if [ -z "${console_params}" ]; then
+                if [ -z "${console_params+x}" ]; then
                     console_params=$arg
                 else
                     console_params="$console_params $arg"
@@ -78,20 +87,46 @@ fatal() {
 
 early_setup
 
-[ -z "$CONSOLE" ] && CONSOLE="/dev/console"
+[ -z "${CONSOLE+x}" ] && CONSOLE="/dev/console"
 
 read_args
 
 mount_and_boot() {
     mkdir -p $ROOT_MOUNT $ROOT_ROMOUNT $ROOT_RWMOUNT
-    mknod /dev/loop0 b 7 0 2>/dev/null
 
-    # Mount read-only root filesystem into initramfs rootfs
-    if ! $MOUNT -o ro,noatime,nodiratime $ROOT_DEVICE $ROOT_ROMOUNT ; then
-	fatal "Could not mount read-only rootfs"
+    # Build mount options for read only root filesystem.
+    # If no read-only device was specified via kernel commandline, use current
+    # rootfs.
+    if [ -z "${ROOT_RODEVICE}" ]; then
+	ROOT_ROMOUNTOPTIONS="--bind,ro /"
+    else
+	ROOT_ROMOUNTOPTIONS="-o ro,noatime,nodiratime $ROOT_RODEVICE"
     fi
 
-    # determine which unification filesystem to use
+    # Mount rootfs as read-only to mount-point
+    if ! $MOUNT $ROOT_ROMOUNTOPTIONS $ROOT_ROMOUNT ; then
+        fatal "Could not mount read-only rootfs"
+    fi
+
+    # Build mount options for read write root filesystem.
+    # If no read-write device was specified via kernel commandline, use tmpfs.
+    if [ -z "${ROOT_RWDEVICE}" ]; then
+	ROOT_RWMOUNTOPTIONS="-t tmpfs -o rw,noatime,mode=755 tmpfs"
+    else
+	ROOT_RWMOUNTOPTIONS="-o rw,noatime,mode=755 $ROOT_RWDEVICE"
+    fi
+
+    # Mount read-write filesystem into initram rootfs
+    if ! $MOUNT $ROOT_RWMOUNTOPTIONS $ROOT_RWMOUNT ; then
+	fatal "Could not mount read-write rootfs"
+    fi
+
+    # Reset read-write filesystem if specified
+    if [ "yes" == "$ROOT_RWRESET" -a -n "${ROOT_RWMOUNT}" ]; then
+	rm -rf $ROOT_RWMOUNT/*
+    fi
+
+    # Determine which unification filesystem to use
     union_fs_type=""
     if grep -w "overlay" /proc/filesystems; then
 	union_fs_type="overlay"
@@ -99,19 +134,6 @@ mount_and_boot() {
 	union_fs_type="aufs"
     else
 	union_fs_type=""
-    fi
-
-    # Build mount options for read write root filesystem.
-    # If no read-write device was specified via kernel commandline, use tmpfs.
-    if [ "tmpfs" == $ROOT_RWDEVICE ]; then
-	ROOT_RWMOUNTOPTIONS="-t tmpfs -o rw,noatime,mode=755"
-    else
-	ROOT_RWMOUNTOPTIONS="-o rw,noatime,mode=755"
-    fi
-
-    # Mount read-write filesystem into initram rootfs
-    if ! $MOUNT $ROOT_RWMOUNTOPTIONS $ROOT_RWDEVICE $ROOT_RWMOUNT ; then
-	fatal "Could not mount read-write rootfs"
     fi
 
     # Create/Mount overlay root filesystem 
@@ -130,14 +152,17 @@ mount_and_boot() {
 
     # Move read-only and read-write root filesystem into the overlay filesystem
     mkdir -p $ROOT_MOUNT/$ROOT_ROMOUNT $ROOT_MOUNT/$ROOT_RWMOUNT
-    $MOUNT --move $ROOT_ROMOUNT $ROOT_MOUNT/$ROOT_ROMOUNT
-    $MOUNT --move $ROOT_RWMOUNT $ROOT_MOUNT/$ROOT_RWMOUNT
+    $MOUNT -n --move $ROOT_ROMOUNT ${ROOT_MOUNT}/$ROOT_ROMOUNT
+    $MOUNT -n --move $ROOT_RWMOUNT ${ROOT_MOUNT}/$ROOT_RWMOUNT
 
     # Watches the udev event queue, and exits if all current events are handled
-    udevadm settle --timeout=3 --quiet
+    udevadm settle --timeout=3
     # Kills the current udev running processes, which survived after
     # device node creation events were handled, to avoid unexpected behavior
     killall -9 "${_UDEV_DAEMON##*/}" 2>/dev/null
+
+    # Remove /run /var/run that are created in early_setup
+    rm -rf /run /var/run
 
     # Move the mount points of some filesystems over to
     # the corresponding directories under the real root filesystem.
@@ -152,9 +177,8 @@ mount_and_boot() {
     cd $ROOT_MOUNT
 
     # busybox switch_root supports -c option
-    exec switch_root -c /dev/console $ROOT_MOUNT /sbin/init $CMDLINE ||
-        fatal "Couldn't switch_root, dropping to shell"
+    exec chroot $ROOT_MOUNT $INIT ||
+        fatal "Couldn't chroot, dropping to shell"
 }
 
 mount_and_boot
-
