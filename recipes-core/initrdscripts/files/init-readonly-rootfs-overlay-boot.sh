@@ -9,6 +9,7 @@ MOUNT="/bin/mount"
 UMOUNT="/bin/umount"
 
 INIT="/sbin/init"
+ROOT_ROINIT="/sbin/init"
 
 ROOT_MOUNT="/mnt"
 ROOT_RODEVICE=""
@@ -17,35 +18,12 @@ ROOT_ROMOUNT="/media/rfs/ro"
 ROOT_RWMOUNT="/media/rfs/rw"
 ROOT_RWRESET="no"
 
-# Copied from initramfs-framework. The core of this script probably should be
-# turned into initramfs-framework modules to reduce duplication.
-udev_daemon() {
-	OPTIONS="/sbin/udev/udevd /sbin/udevd /lib/udev/udevd /lib/systemd/systemd-udevd"
-
-	for o in $OPTIONS; do
-		if [ -x "$o" ]; then
-			echo $o
-			return 0
-		fi
-	done
-
-	return 1
-}
-
-_UDEV_DAEMON=`udev_daemon`
-
 early_setup() {
     mkdir -p /proc
     mkdir -p /sys
     $MOUNT -t proc proc /proc
     $MOUNT -t sysfs sysfs /sys
-    $MOUNT -t devtmpfs none /dev
-
-    mkdir -p /run
-    mkdir -p /var/run
-
-    $_UDEV_DAEMON --daemon
-    udevadm trigger --action=add
+    grep -w "/dev" /proc/mounts >/dev/null || $MOUNT -t devtmpfs none /dev
 }
 
 read_args() {
@@ -57,6 +35,8 @@ read_args() {
                 ROOT_RODEVICE=$optarg ;;
             rootfstype=*)
                 modprobe $optarg 2> /dev/null ;;
+            rootinit=*)
+                ROOT_ROINIT=$optarg ;;
             rootrw=*)
                 ROOT_RWDEVICE=$optarg ;;
             rootrwfstype=*)
@@ -108,6 +88,13 @@ mount_and_boot() {
         fatal "Could not mount read-only rootfs"
     fi
 
+    # If future init is the same as current file, use $ROOT_ROINIT
+    # Tries to avoid loop to infinity if init is set to current file via
+    # kernel commandline
+    if cmp -s "$0" "$INIT"; then
+	INIT="$ROOT_ROINIT"
+    fi
+
     # Build mount options for read write root filesystem.
     # If no read-write device was specified via kernel commandline, use tmpfs.
     if [ -z "${ROOT_RWDEVICE}" ]; then
@@ -128,9 +115,9 @@ mount_and_boot() {
 
     # Determine which unification filesystem to use
     union_fs_type=""
-    if grep -w "overlay" /proc/filesystems; then
+    if grep -w "overlay" /proc/filesystems >/dev/null; then
 	union_fs_type="overlay"
-    elif grep -w "aufs" /proc/filesystems; then
+    elif grep -w "aufs" /proc/filesystems >/dev/null; then
 	union_fs_type="aufs"
     else
 	union_fs_type=""
@@ -155,21 +142,6 @@ mount_and_boot() {
     $MOUNT -n --move $ROOT_ROMOUNT ${ROOT_MOUNT}/$ROOT_ROMOUNT
     $MOUNT -n --move $ROOT_RWMOUNT ${ROOT_MOUNT}/$ROOT_RWMOUNT
 
-    # Watches the udev event queue, and exits if all current events are handled
-    udevadm settle --timeout=3
-    # Kills the current udev running processes, which survived after
-    # device node creation events were handled, to avoid unexpected behavior
-    killall -9 "${_UDEV_DAEMON##*/}" 2>/dev/null
-
-    # Remove /run /var/run that are created in early_setup
-    rm -rf /run /var/run
-
-    # Move the mount points of some filesystems over to
-    # the corresponding directories under the real root filesystem.
-    for dir in `awk '/\/dev.* \/run\/media/{print $2}' /proc/mounts`; do
-        mkdir -p ${ROOT_MOUNT}/media/${dir##*/}
-        $MOUNT -n --move $dir ${ROOT_MOUNT}/media/${dir##*/}
-    done
     $MOUNT -n --move /proc ${ROOT_MOUNT}/proc
     $MOUNT -n --move /sys ${ROOT_MOUNT}/sys
     $MOUNT -n --move /dev ${ROOT_MOUNT}/dev

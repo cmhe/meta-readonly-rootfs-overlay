@@ -57,17 +57,47 @@ If you use this layer you do *not* need to set `read-only-rootfs` in the
 
 ## Kernel command line parameters
 
-Example:
+### Example using initrd:
 
 ```
-root=/dev/sda1 rootfstype=ext4 rootrw=/dev/sda2 rootrwfstype=btrfs
+root=/dev/sda1 rootrw=/dev/sda2
 ```
+
+This cmd line start `/sbin/init` with the `/dev/sda1` partition as the read-only
+rootfs and the `/dev/sda2` partition as the read-write persistend state.
+
+```
+root=/dev/sda1 rootrw=/dev/sda2 init=/bin/sh
+```
+
+The same as before but it now starts `/bin/sh` instead of `/sbin/init`.
+
+### Example without initrd:
+
+```
+root=/dev/sda1 rootrw=/dev/sda2 init=/init
+```
+
+This cmd line starts `/sbin/init` with `/dev/sda1` partition as the read-only
+rootfs and the `/dev/sda2` partition as the read-write persistend state. When
+using this init script without an initrd, `init=/init` has to be set.
+
+```
+root=/dev/sda1 rootrw=/dev/sda2 init=/init rootinit=/bin/sh
+```
+
+The same as before but it now starts `/bin/sh` instead of `/sbin/init`
+
+### Details
 
 `root=` specifies the read-only root filesystem device. If this is not
 specified, the current rootfs is used.
 
 `rootfstype=` if support for the-read only filesystem is not build into the
 kernel, you can specifiy the required module name here.
+
+`rootinit=` if the `init` parameter was used to specify this init script,
+`rootinit` can be used to overwrite the default (`/sbin/init`).
 
 `rootrw=` specifies the read-write filesystem device. If this is not
 specified, `tmpfs` is used.
