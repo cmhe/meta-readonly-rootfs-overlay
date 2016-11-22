@@ -1,7 +1,36 @@
-This README.md file contains information on the contents of the
-readonly-rootfs-overlay layer.
+# meta-readonly-rootfs-overlay
 
-Please see the corresponding sections below for details.
+This yocto layer provides the necessary scripts and configurations to setup a
+writable root file system overlay on top of a read-only root filesystem.
+
+## Why does this exists?
+
+Having a read-only root file system is useful for many scenarios:
+
+- Have a unmodifiable factory root file system
+- Seperate user specific changes from system configuration
+- Allow factory reset, by deleting the user specfic changes
+- Have a fallback image in case the user specific changes made the root file
+system no longer bootable.
+
+Because some data on the root file system changes on first boot or while the
+system is running, just mounting the complete root file system as read-only
+breaks many applications. There are different solutions to this problem:
+
+- Symlinking/Bind mounting files and directories that could potentially change
+while the system is running to a writable partition
+- Instead of having a read-only root files system, mounting a writable overlay
+root file system, that uses a read-only file system as its base and writes
+changed data to another writable partition.
+
+To implement the first solution, the developer needs to analyse which file
+needs to change and then create symlinks for them. When doing factory reset,
+the developer "empties" every file that is linked, to avoid dangling
+symlinks/binds. While this is more work on the developer side, it might
+increase the security, because only files that are symlinked/bind-mounted can
+be changed.
+
+This meta-layer provides the second solution.
 
 # Dependencies
 
