@@ -29,18 +29,19 @@ early_setup() {
 read_args() {
     [ -z "${CMDLINE+x}" ] && CMDLINE=`cat /proc/cmdline`
     for arg in $CMDLINE; do
-        optarg=`expr "x$arg" : 'x[^=]*=\(.*\)'`
+        # Set optarg to option parameter, and '' if no parameter was given
+        optarg=`expr "x$arg" : 'x[^=]*=\(.*\)' || echo ''`
         case $arg in
             root=*)
                 ROOT_RODEVICE=$optarg ;;
             rootfstype=*)
-                modprobe $optarg 2> /dev/null ;;
+                modprobe $optarg 2> /dev/null || true;;
             rootinit=*)
                 ROOT_ROINIT=$optarg ;;
             rootrw=*)
                 ROOT_RWDEVICE=$optarg ;;
             rootrwfstype=*)
-                modprobe $optarg 2> /dev/null ;;
+                modprobe $optarg 2> /dev/null || true;;
             rootrwreset=*)
                 ROOT_RWRESET=$optarg ;;
             init=*)
@@ -66,15 +67,18 @@ mount_and_boot() {
 
     # Build mount options for read only root filesystem.
     # If no read-only device was specified via kernel commandline, use current
-    # rootfs.
+    # rootfs via bind mount.
+    ROOT_ROMOUNTOPTIONS_BIND="-o bind,ro /"
     if [ -z "${ROOT_RODEVICE}" ]; then
-	ROOT_ROMOUNTOPTIONS="--bind,ro /"
+	ROOT_ROMOUNTOPTIONS="${ROOT_ROMOUNTOPTIONS_BIND}"
     else
 	ROOT_ROMOUNTOPTIONS="-o ro,noatime,nodiratime $ROOT_RODEVICE"
     fi
 
-    # Mount rootfs as read-only to mount-point
-    if ! $MOUNT $ROOT_ROMOUNTOPTIONS $ROOT_ROMOUNT ; then
+    # Mount rootfs as read-only to mount-point, if unsuccessful,
+    # try bind mount current rootfs
+    if ! $MOUNT $ROOT_ROMOUNTOPTIONS $ROOT_ROMOUNT && \
+       ! $MOUNT $ROOT_ROMOUNTOPTIONS_BIND $ROOT_ROMOUNT; then
         fatal "Could not mount read-only rootfs"
     fi
 
