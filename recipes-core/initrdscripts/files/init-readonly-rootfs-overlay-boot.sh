@@ -43,18 +43,8 @@ read_args() {
                 modprobe $optarg 2> /dev/null ;;
             rootrwreset=*)
                 ROOT_RWRESET=$optarg ;;
-            video=*)
-                video_mode=$arg ;;
-            vga=*)
-                vga_mode=$arg ;;
             init=*)
                 INIT=$optarg ;;
-            console=*)
-                if [ -z "${console_params+x}" ]; then
-                    console_params=$arg
-                else
-                    console_params="$console_params $arg"
-                fi ;;
         esac
     done
 }
