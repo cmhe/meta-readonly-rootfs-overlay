@@ -1,15 +1,15 @@
 # meta-readonly-rootfs-overlay
 
 This yocto layer provides the necessary scripts and configurations to setup a
-writable root file system overlay on top of a read-only root filesystem.
+writable root file system overlay on top of a read-only root file system.
 
 ## Why does this exists?
 
 Having a read-only root file system is useful for many scenarios:
 
-- Have a unmodifiable factory root file system
-- Seperate user specific changes from system configuration
-- Allow factory reset, by deleting the user specfic changes
+- Separate user specific changes from system configuration, and being able to
+find differences
+- Allow factory reset, by deleting the user specific changes
 - Have a fallback image in case the user specific changes made the root file
 system no longer bootable.
 
@@ -25,12 +25,15 @@ changed data to another writable partition.
 
 To implement the first solution, the developer needs to analyse which file
 needs to change and then create symlinks for them. When doing factory reset,
-the developer "empties" every file that is linked, to avoid dangling
-symlinks/binds. While this is more work on the developer side, it might
-increase the security, because only files that are symlinked/bind-mounted can
-be changed.
+the developer needs to overwrite every file that is linked with the factory
+configuration, to avoid dangling symlinks/binds. While this is more work on the
+developer side, it might increase the security, because only files that are
+symlinked/bind-mounted can be changed. However, IMO that is better left to file
+permissions.
 
-This meta-layer provides the second solution.
+This meta-layer provides the second solution. Here no investigation of writable
+files are needed and factory reset can be done by just deleting all files or
+formatting the writable volume.
 
 # Dependencies
 
@@ -79,6 +82,15 @@ other layers needed. e.g.:
     "
 ```
 
+To add the script to your image, just add:
+
+```
+  IMAGE_INSTALL_append = " initscripts-readonly-rootfs-overlay"
+```
+
+to your `local.conf` or image recipe. Or use
+`core-image-rorootfs-overlay-initramfs` as initrd.
+
 ## Read-only root filesystem
 
 If you use this layer you do *not* need to set `read-only-rootfs` in the
@@ -93,7 +105,7 @@ root=/dev/sda1 rootrw=/dev/sda2
 ```
 
 This cmd line start `/sbin/init` with the `/dev/sda1` partition as the read-only
-rootfs and the `/dev/sda2` partition as the read-write persistend state.
+rootfs and the `/dev/sda2` partition as the read-write persistent state.
 
 ```
 root=/dev/sda1 rootrw=/dev/sda2 init=/bin/sh
@@ -108,7 +120,7 @@ root=/dev/sda1 rootrw=/dev/sda2 init=/init
 ```
 
 This cmd line starts `/sbin/init` with `/dev/sda1` partition as the read-only
-rootfs and the `/dev/sda2` partition as the read-write persistend state. When
+rootfs and the `/dev/sda2` partition as the read-write persistent state. When
 using this init script without an initrd, `init=/init` has to be set.
 
 ```
@@ -119,20 +131,20 @@ The same as before but it now starts `/bin/sh` instead of `/sbin/init`
 
 ### Details
 
-`root=` specifies the read-only root filesystem device. If this is not
+`root=` specifies the read-only root file system device. If this is not
 specified, the current rootfs is used.
 
-`rootfstype=` if support for the-read only filesystem is not build into the
-kernel, you can specifiy the required module name here.
+`rootfstype=` if support for the-read only file system is not build into the
+kernel, you can specify the required module name here.
 
 `rootinit=` if the `init` parameter was used to specify this init script,
 `rootinit` can be used to overwrite the default (`/sbin/init`).
 
-`rootrw=` specifies the read-write filesystem device. If this is not
+`rootrw=` specifies the read-write file system device. If this is not
 specified, `tmpfs` is used.
 
-`rootrwfstype=` if support for the read-write filesystem is not build into the
-kernel, you can specifiy the required module name here.
+`rootrwfstype=` if support for the read-write file system is not build into the
+kernel, you can specify the required module name here.
 
 `rootrwreset=` set to `yes` if you want to delete all the files in the
-read-write filesystem prior to building the overlay root files system.
+read-write file system prior to building the overlay root files system.
