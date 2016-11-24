@@ -19,41 +19,44 @@ ROOT_RWMOUNT="/media/rfs/rw"
 ROOT_RWRESET="no"
 
 early_setup() {
-    mkdir -p /proc
-    mkdir -p /sys
-    $MOUNT -t proc proc /proc
-    $MOUNT -t sysfs sysfs /sys
-    grep -w "/dev" /proc/mounts >/dev/null || $MOUNT -t devtmpfs none /dev
+	mkdir -p /proc
+	mkdir -p /sys
+	$MOUNT -t proc proc /proc
+	$MOUNT -t sysfs sysfs /sys
+	grep -w "/dev" /proc/mounts >/dev/null || $MOUNT -t devtmpfs none /dev
 }
 
 read_args() {
-    [ -z "${CMDLINE+x}" ] && CMDLINE=`cat /proc/cmdline`
-    for arg in $CMDLINE; do
-        # Set optarg to option parameter, and '' if no parameter was given
-        optarg=`expr "x$arg" : 'x[^=]*=\(.*\)' || echo ''`
-        case $arg in
-            root=*)
-                ROOT_RODEVICE=$optarg ;;
-            rootfstype=*)
-                modprobe $optarg 2> /dev/null || true;;
-            rootinit=*)
-                ROOT_ROINIT=$optarg ;;
-            rootrw=*)
-                ROOT_RWDEVICE=$optarg ;;
-            rootrwfstype=*)
-                modprobe $optarg 2> /dev/null || true;;
-            rootrwreset=*)
-                ROOT_RWRESET=$optarg ;;
-            init=*)
-                INIT=$optarg ;;
-        esac
-    done
+	[ -z "${CMDLINE+x}" ] && CMDLINE=`cat /proc/cmdline`
+	for arg in $CMDLINE; do
+		# Set optarg to option parameter, and '' if no parameter was
+		# given
+		optarg=`expr "x$arg" : 'x[^=]*=\(.*\)' || echo ''`
+		case $arg in
+			root=*)
+				ROOT_RODEVICE=$optarg ;;
+			rootfstype=*)
+				modprobe $optarg 2> /dev/null || \
+					echo "Could not load $optarg module";;
+			rootinit=*)
+				ROOT_ROINIT=$optarg ;;
+			rootrw=*)
+				ROOT_RWDEVICE=$optarg ;;
+			rootrwfstype=*)
+				modprobe $optarg 2> /dev/null || \
+					echo "Could not load $optarg module";;
+			rootrwreset=*)
+				ROOT_RWRESET=$optarg ;;
+			init=*)
+			INIT=$optarg ;;
+		esac
+	done
 }
 
 fatal() {
-    echo $1 >$CONSOLE
-    echo >$CONSOLE
-    exec sh
+	echo $1 >$CONSOLE
+	echo >$CONSOLE
+	exec sh
 }
 
 early_setup
@@ -63,88 +66,90 @@ early_setup
 read_args
 
 mount_and_boot() {
-    mkdir -p $ROOT_MOUNT $ROOT_ROMOUNT $ROOT_RWMOUNT
+	mkdir -p $ROOT_MOUNT $ROOT_ROMOUNT $ROOT_RWMOUNT
 
-    # Build mount options for read only root filesystem.
-    # If no read-only device was specified via kernel commandline, use current
-    # rootfs via bind mount.
-    ROOT_ROMOUNTOPTIONS_BIND="-o bind,ro /"
-    if [ -z "${ROOT_RODEVICE}" ]; then
-	ROOT_ROMOUNTOPTIONS="${ROOT_ROMOUNTOPTIONS_BIND}"
-    else
-	ROOT_ROMOUNTOPTIONS="-o ro,noatime,nodiratime $ROOT_RODEVICE"
-    fi
+	# Build mount options for read only root file system.
+	# If no read-only device was specified via kernel command line, use
+	# current root file system via bind mount.
+	ROOT_ROMOUNTOPTIONS_BIND="-o bind,ro /"
+	if [ -z "${ROOT_RODEVICE}" ]; then
+		ROOT_ROMOUNTOPTIONS="${ROOT_ROMOUNTOPTIONS_BIND}"
+	else
+		ROOT_ROMOUNTOPTIONS="-o ro,noatime,nodiratime $ROOT_RODEVICE"
+	fi
 
-    # Mount rootfs as read-only to mount-point, if unsuccessful,
-    # try bind mount current rootfs
-    if ! $MOUNT $ROOT_ROMOUNTOPTIONS $ROOT_ROMOUNT && \
-       ! $MOUNT $ROOT_ROMOUNTOPTIONS_BIND $ROOT_ROMOUNT; then
-        fatal "Could not mount read-only rootfs"
-    fi
+	# Mount root file system as read-only to mount-point, if unsuccessful,
+	# try bind mount current rootfs
+	if ! $MOUNT $ROOT_ROMOUNTOPTIONS $ROOT_ROMOUNT && \
+		! $MOUNT $ROOT_ROMOUNTOPTIONS_BIND $ROOT_ROMOUNT; then
+		fatal "Could not mount read-only rootfs"
+	fi
 
-    # If future init is the same as current file, use $ROOT_ROINIT
-    # Tries to avoid loop to infinity if init is set to current file via
-    # kernel commandline
-    if cmp -s "$0" "$INIT"; then
-	INIT="$ROOT_ROINIT"
-    fi
+	# If future init is the same as current file, use $ROOT_ROINIT
+	# Tries to avoid loop to infinity if init is set to current file via
+	# kernel command line
+	if cmp -s "$0" "$INIT"; then
+		INIT="$ROOT_ROINIT"
+	fi
 
-    # Build mount options for read write root filesystem.
-    # If no read-write device was specified via kernel commandline, use tmpfs.
-    if [ -z "${ROOT_RWDEVICE}" ]; then
-	ROOT_RWMOUNTOPTIONS="-t tmpfs -o rw,noatime,mode=755 tmpfs"
-    else
-	ROOT_RWMOUNTOPTIONS="-o rw,noatime,mode=755 $ROOT_RWDEVICE"
-    fi
+	# Build mount options for read write root file system.
+	# If no read-write device was specified via kernel command line, use
+	# tmpfs.
+	if [ -z "${ROOT_RWDEVICE}" ]; then
+		ROOT_RWMOUNTOPTIONS="-t tmpfs -o rw,noatime,mode=755 tmpfs"
+	else
+		ROOT_RWMOUNTOPTIONS="-o rw,noatime,mode=755 $ROOT_RWDEVICE"
+	fi
 
-    # Mount read-write filesystem into initram rootfs
-    if ! $MOUNT $ROOT_RWMOUNTOPTIONS $ROOT_RWMOUNT ; then
-	fatal "Could not mount read-write rootfs"
-    fi
+	# Mount read-write file system into initram root file system
+	if ! $MOUNT $ROOT_RWMOUNTOPTIONS $ROOT_RWMOUNT ; then
+		fatal "Could not mount read-write rootfs"
+	fi
 
-    # Reset read-write filesystem if specified
-    if [ "yes" == "$ROOT_RWRESET" -a -n "${ROOT_RWMOUNT}" ]; then
-	rm -rf $ROOT_RWMOUNT/*
-    fi
+	# Reset read-write file system if specified
+	if [ "yes" == "$ROOT_RWRESET" -a -n "${ROOT_RWMOUNT}" ]; then
+		rm -rf $ROOT_RWMOUNT/*
+	fi
 
-    # Determine which unification filesystem to use
-    union_fs_type=""
-    if grep -w "overlay" /proc/filesystems >/dev/null; then
-	union_fs_type="overlay"
-    elif grep -w "aufs" /proc/filesystems >/dev/null; then
-	union_fs_type="aufs"
-    else
+	# Determine which unification file system to use
 	union_fs_type=""
-    fi
+	if grep -w "overlay" /proc/filesystems >/dev/null; then
+		union_fs_type="overlay"
+	elif grep -w "aufs" /proc/filesystems >/dev/null; then
+		union_fs_type="aufs"
+	else
+		union_fs_type=""
+	fi
 
-    # Create/Mount overlay root filesystem 
-    case $union_fs_type in
-	"overlay")
-	    mkdir -p $ROOT_RWMOUNT/upperdir $ROOT_RWMOUNT/work
-	    $MOUNT -t overlay overlay -o "lowerdir=$ROOT_ROMOUNT,upperdir=$ROOT_RWMOUNT/upperdir,workdir=$ROOT_RWMOUNT/work" $ROOT_MOUNT
-	    ;;
-	"aufs")
-	    $MOUNT -t aufs -o "dirs=$ROOT_RWMOUNT=rw:$ROOT_ROMOUNT=ro" aufs $ROOT_MOUNT
-	    ;;
-	"")
-	    fatal "No overlay filesystem type available"
-	    ;;
-    esac
+	# Create/Mount overlay root file system
+	case $union_fs_type in
+		"overlay")
+			mkdir -p $ROOT_RWMOUNT/upperdir $ROOT_RWMOUNT/work
+			$MOUNT -t overlay overlay -o "lowerdir=$ROOT_ROMOUNT,upperdir=$ROOT_RWMOUNT/upperdir,workdir=$ROOT_RWMOUNT/work" $ROOT_MOUNT
+			;;
+		"aufs")
+			$MOUNT -t aufs -o "dirs=$ROOT_RWMOUNT=rw:$ROOT_ROMOUNT=ro" aufs $ROOT_MOUNT
+			;;
+		"")
+			fatal "No overlay filesystem type available"
+			;;
+	esac
 
-    # Move read-only and read-write root filesystem into the overlay filesystem
-    mkdir -p $ROOT_MOUNT/$ROOT_ROMOUNT $ROOT_MOUNT/$ROOT_RWMOUNT
-    $MOUNT -n --move $ROOT_ROMOUNT ${ROOT_MOUNT}/$ROOT_ROMOUNT
-    $MOUNT -n --move $ROOT_RWMOUNT ${ROOT_MOUNT}/$ROOT_RWMOUNT
+	# Move read-only and read-write root file system into the overlay
+	# file system
+	mkdir -p $ROOT_MOUNT/$ROOT_ROMOUNT $ROOT_MOUNT/$ROOT_RWMOUNT
+	$MOUNT -n --move $ROOT_ROMOUNT ${ROOT_MOUNT}/$ROOT_ROMOUNT
+	$MOUNT -n --move $ROOT_RWMOUNT ${ROOT_MOUNT}/$ROOT_RWMOUNT
 
-    $MOUNT -n --move /proc ${ROOT_MOUNT}/proc
-    $MOUNT -n --move /sys ${ROOT_MOUNT}/sys
-    $MOUNT -n --move /dev ${ROOT_MOUNT}/dev
+	$MOUNT -n --move /proc ${ROOT_MOUNT}/proc
+	$MOUNT -n --move /sys ${ROOT_MOUNT}/sys
+	$MOUNT -n --move /dev ${ROOT_MOUNT}/dev
 
-    cd $ROOT_MOUNT
+	cd $ROOT_MOUNT
 
-    # busybox switch_root supports -c option
-    exec chroot $ROOT_MOUNT $INIT ||
-        fatal "Couldn't chroot, dropping to shell"
+	# switch to actual init in the overlay root file system
+	exec chroot $ROOT_MOUNT $INIT ||
+		fatal "Couldn't chroot, dropping to shell"
 }
 
 mount_and_boot
