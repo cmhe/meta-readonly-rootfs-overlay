@@ -37,14 +37,14 @@ read_args() {
 				ROOT_RODEVICE=$optarg ;;
 			rootfstype=*)
 				modprobe $optarg 2> /dev/null || \
-					echo "Could not load $optarg module";;
+					log "Could not load $optarg module";;
 			rootinit=*)
 				ROOT_ROINIT=$optarg ;;
 			rootrw=*)
 				ROOT_RWDEVICE=$optarg ;;
 			rootrwfstype=*)
 				modprobe $optarg 2> /dev/null || \
-					echo "Could not load $optarg module";;
+					log "Could not load $optarg module";;
 			rootrwreset=*)
 				ROOT_RWRESET=$optarg ;;
 			init=*)
@@ -54,9 +54,13 @@ read_args() {
 }
 
 fatal() {
-	echo $1 >$CONSOLE
+	echo "rorootfs-overlay: $1" >$CONSOLE
 	echo >$CONSOLE
 	exec sh
+}
+
+log() {
+	echo "rorootfs-overlay: $1" >$CONSOLE
 }
 
 early_setup
@@ -71,18 +75,25 @@ mount_and_boot() {
 	# Build mount options for read only root file system.
 	# If no read-only device was specified via kernel command line, use
 	# current root file system via bind mount.
-	ROOT_ROMOUNTOPTIONS_BIND="-o bind,ro /"
+	ROOT_ROMOUNTOPTIONS_BIND="-o bind /"
 	if [ -z "${ROOT_RODEVICE}" ]; then
 		ROOT_ROMOUNTOPTIONS="${ROOT_ROMOUNTOPTIONS_BIND}"
 	else
-		ROOT_ROMOUNTOPTIONS="-o ro,noatime,nodiratime $ROOT_RODEVICE"
+		ROOT_ROMOUNTOPTIONS="-o noatime,nodiratime $ROOT_RODEVICE"
 	fi
 
-	# Mount root file system as read-only to mount-point, if unsuccessful,
-	# try bind mount current rootfs
-	if ! $MOUNT $ROOT_ROMOUNTOPTIONS $ROOT_ROMOUNT && \
-		! $MOUNT $ROOT_ROMOUNTOPTIONS_BIND $ROOT_ROMOUNT; then
+	# Mount root file system to new mount-point, if unsuccessful, try bind
+	# mounting current root file system.
+	if ! $MOUNT $ROOT_ROMOUNTOPTIONS "$ROOT_ROMOUNT" 2>/dev/null && \
+		[ "x$ROOT_ROMOUNTOPTIONS_BIND" == "x$ROOT_ROMOUNTOPTIONS" ] || \
+		log "Could not mount $ROOT_RODEVICE, bind mounting..." && \
+		! $MOUNT $ROOT_ROMOUNTOPTIONS_BIND "$ROOT_ROMOUNT"; then
 		fatal "Could not mount read-only rootfs"
+	fi
+
+	# Remounting root file system as read only.
+	if ! $MOUNT -o remount,ro "$ROOT_ROMOUNT"; then
+		fatal "Could not remount read-only rootfs as read only"
 	fi
 
 	# If future init is the same as current file, use $ROOT_ROINIT
@@ -125,10 +136,17 @@ mount_and_boot() {
 	case $union_fs_type in
 		"overlay")
 			mkdir -p $ROOT_RWMOUNT/upperdir $ROOT_RWMOUNT/work
-			$MOUNT -t overlay overlay -o "lowerdir=$ROOT_ROMOUNT,upperdir=$ROOT_RWMOUNT/upperdir,workdir=$ROOT_RWMOUNT/work" $ROOT_MOUNT
+			$MOUNT -t overlay overlay \
+				-o "$(printf "%s%s%s" \
+					"lowerdir=$ROOT_ROMOUNT," \
+					"upperdir=$ROOT_RWMOUNT/upperdir," \
+					"workdir=$ROOT_RWMOUNT/work")" \
+				$ROOT_MOUNT
 			;;
 		"aufs")
-			$MOUNT -t aufs -o "dirs=$ROOT_RWMOUNT=rw:$ROOT_ROMOUNT=ro" aufs $ROOT_MOUNT
+			$MOUNT -t aufs i\
+				-o "dirs=$ROOT_RWMOUNT=rw:$ROOT_ROMOUNT=ro" \
+				aufs $ROOT_MOUNT
 			;;
 		"")
 			fatal "No overlay filesystem type available"
