@@ -1,7 +1,7 @@
 # meta-readonly-rootfs-overlay
 
-This yocto layer provides the necessary scripts and configurations to setup a
-writable root file system overlay on top of a read-only root file system.
+This OpenEmbedded layer provides the necessary scripts and configurations to
+setup a writable root file system overlay on top of a read-only root file system.
 
 ## Why does this exists?
 
@@ -69,16 +69,16 @@ In order to use this layer, you need to make the build system aware of
 it.
 
 Assuming the readonly-rootfs-overlay layer exists at the top-level of your
-yocto build tree, you can add it to the build system by adding the
+OpenEmbedded source tree, you can add it to the build system by adding the
 location of the readonly-rootfs-overlay layer to bblayers.conf, along with any
 other layers needed. e.g.:
 
 ```
   BBLAYERS ?= " \
-    /path/to/yocto/meta \
-    /path/to/yocto/meta-poky \
-    /path/to/yocto/meta-yocto-bsp \
-    /path/to/yocto/meta-readonly-rootfs-overlay \
+    /path/to/layers/meta \
+    /path/to/layers/meta-poky \
+    /path/to/layers/meta-yocto-bsp \
+    /path/to/layers/meta-readonly-rootfs-overlay \
     "
 ```
 
