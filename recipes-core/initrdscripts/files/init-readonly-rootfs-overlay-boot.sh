@@ -16,6 +16,7 @@ ROOT_RODEVICE=""
 ROOT_RWDEVICE=""
 ROOT_ROMOUNT="/media/rfs/ro"
 ROOT_RWMOUNT="/media/rfs/rw"
+ROOT_RWTYPE=""
 ROOT_RWRESET="no"
 
 early_setup() {
@@ -43,6 +44,7 @@ read_args() {
 			rootrw=*)
 				ROOT_RWDEVICE=$optarg ;;
 			rootrwfstype=*)
+				ROOT_RWTYPE=$optarg
 				modprobe $optarg 2> /dev/null || \
 					log "Could not load $optarg module";;
 			rootrwreset=*)
@@ -108,8 +110,10 @@ mount_and_boot() {
 	# tmpfs.
 	if [ -z "${ROOT_RWDEVICE}" ]; then
 		ROOT_RWMOUNTOPTIONS="-t tmpfs -o rw,noatime,mode=755 tmpfs"
+	elif [ -z "${ROOT_RWTYPE}" ]; then
+		ROOT_RWMOUNTOPTIONS="-o rw,noatime $ROOT_RWDEVICE"
 	else
-		ROOT_RWMOUNTOPTIONS="-o rw,noatime,mode=755 $ROOT_RWDEVICE"
+		ROOT_RWMOUNTOPTIONS="-t $ROOT_RWTYPE -o rw,noatime $ROOT_RWDEVICE"
 	fi
 
 	# Mount read-write file system into initram root file system
