@@ -134,8 +134,12 @@ The same as before but it now starts `/bin/sh` instead of `/sbin/init`
 `root=` specifies the read-only root file system device. If this is not
 specified, the current rootfs is used.
 
-`rootfstype=` if support for the-read only file system is not build into the
-kernel, you can specify the required module name here.
+`rootfstype=` if support for the read-only file system is not build into the
+kernel, you can specify the required module name here. It will also be used in
+the mount command.
+
+`rootoptions=` specifies the mount options of the read-only file system.
+Defaults to `noatime,nodiratime`.
 
 `rootinit=` if the `init` parameter was used to specify this init script,
 `rootinit` can be used to overwrite the default (`/sbin/init`).
@@ -144,7 +148,11 @@ kernel, you can specify the required module name here.
 specified, `tmpfs` is used.
 
 `rootrwfstype=` if support for the read-write file system is not build into the
-kernel, you can specify the required module name here.
+kernel, you can specify the required module name here. It will also be used in
+the mount command.
+
+`rootrwoptions=` specifies the mount options of the read-write file system.
+Defaults to `rw,noatime,mode=755`.
 
 `rootrwreset=` set to `yes` if you want to delete all the files in the
 read-write file system prior to building the overlay root files system.

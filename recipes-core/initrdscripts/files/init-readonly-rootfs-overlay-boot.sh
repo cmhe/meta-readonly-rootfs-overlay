@@ -18,6 +18,14 @@ ROOT_ROMOUNT="/media/rfs/ro"
 ROOT_RWMOUNT="/media/rfs/rw"
 ROOT_RWRESET="no"
 
+ROOT_ROFSTYPE=""
+ROOT_ROMOUNTOPTIONS="bind"
+ROOT_ROMOUNTOPTIONS_DEVICE="noatime,nodiratime"
+
+ROOT_RWFSTYPE=""
+ROOT_RWMOUNTOPTIONS="rw,noatime,mode=755 tmpfs"
+ROOT_RWMOUNTOPTIONS_DEVICE="rw,noatime,mode=755"
+
 early_setup() {
 	mkdir -p /proc
 	mkdir -p /sys
@@ -36,17 +44,23 @@ read_args() {
 			root=*)
 				ROOT_RODEVICE=$optarg ;;
 			rootfstype=*)
+				ROOT_ROFSTYPE="$optarg"
 				modprobe $optarg 2> /dev/null || \
 					log "Could not load $optarg module";;
 			rootinit=*)
 				ROOT_ROINIT=$optarg ;;
+			rootoptions=*)
+				ROOT_ROMOUNTOPTIONS_DEVICE="$optarg" ;;
 			rootrw=*)
 				ROOT_RWDEVICE=$optarg ;;
 			rootrwfstype=*)
+				ROOT_RWFSTYPE="$optarg"
 				modprobe $optarg 2> /dev/null || \
 					log "Could not load $optarg module";;
 			rootrwreset=*)
 				ROOT_RWRESET=$optarg ;;
+			rootrwoptions=*)
+				ROOT_RWMOUNTOPTIONS_DEVICE="$optarg" ;;
 			init=*)
 			INIT=$optarg ;;
 		esac
@@ -75,19 +89,22 @@ mount_and_boot() {
 	# Build mount options for read only root file system.
 	# If no read-only device was specified via kernel command line, use
 	# current root file system via bind mount.
-	ROOT_ROMOUNTOPTIONS_BIND="-o bind /"
-	if [ -z "${ROOT_RODEVICE}" ]; then
-		ROOT_ROMOUNTOPTIONS="${ROOT_ROMOUNTOPTIONS_BIND}"
+	ROOT_ROMOUNTPARAMS_BIND="-o ${ROOT_ROMOUNTOPTIONS} /"
+	if [ -n "${ROOT_RODEVICE}" ]; then
+		ROOT_ROMOUNTPARAMS="-o ${ROOT_ROMOUNTOPTIONS_DEVICE} $ROOT_RODEVICE"
+		if [ -n "${ROOT_ROFSTYPE}" ]; then
+			ROOT_ROMOUNTPARAMS="-t $ROOT_ROFSTYPE $ROOT_ROMOUNTPARAMS"
+		fi
 	else
-		ROOT_ROMOUNTOPTIONS="-o noatime,nodiratime $ROOT_RODEVICE"
+		ROOT_ROMOUNTPARAMS="$ROOT_ROMOUNTPARAMS_BIND"
 	fi
 
 	# Mount root file system to new mount-point, if unsuccessful, try bind
 	# mounting current root file system.
-	if ! $MOUNT $ROOT_ROMOUNTOPTIONS "$ROOT_ROMOUNT" 2>/dev/null && \
-		[ "x$ROOT_ROMOUNTOPTIONS_BIND" == "x$ROOT_ROMOUNTOPTIONS" ] || \
+	if ! $MOUNT $ROOT_ROMOUNTPARAMS "$ROOT_ROMOUNT" 2>/dev/null && \
+		[ "x$ROOT_ROMOUNTPARAMS_BIND" == "x$ROOT_ROMOUNTPARAMS" ] || \
 		log "Could not mount $ROOT_RODEVICE, bind mounting..." && \
-		! $MOUNT $ROOT_ROMOUNTOPTIONS_BIND "$ROOT_ROMOUNT"; then
+		! $MOUNT $ROOT_ROMOUNTPARAMS_BIND "$ROOT_ROMOUNT"; then
 		fatal "Could not mount read-only rootfs"
 	fi
 
@@ -104,16 +121,20 @@ mount_and_boot() {
 	fi
 
 	# Build mount options for read write root file system.
-	# If no read-write device was specified via kernel command line, use
-	# tmpfs.
-	if [ -z "${ROOT_RWDEVICE}" ]; then
-		ROOT_RWMOUNTOPTIONS="-t tmpfs -o rw,noatime,mode=755 tmpfs"
+	# If a read-write device was specified via kernel command line, use
+	# it, otherwise default to tmpfs.
+	if [ -n "${ROOT_RWDEVICE}" ]; then
+		
+		ROOT_RWMOUNTPARAMS="-o $ROOT_RWMOUNTOPTIONS_DEVICE $ROOT_RWDEVICE"
+		if [ -n "${ROOT_RWFSTYPE}" ]; then
+			ROOT_RWMOUNTPARAMS="-t $ROOT_RWFSTYPE $ROOT_RWMOUNTPARAMS"
+		fi
 	else
-		ROOT_RWMOUNTOPTIONS="-o rw,noatime,mode=755 $ROOT_RWDEVICE"
+		ROOT_RWMOUNTPARAMS="-t tmpfs -o $ROOT_RWMOUNTOPTIONS"
 	fi
 
 	# Mount read-write file system into initram root file system
-	if ! $MOUNT $ROOT_RWMOUNTOPTIONS $ROOT_RWMOUNT ; then
+	if ! $MOUNT $ROOT_RWMOUNTPARAMS $ROOT_RWMOUNT ; then
 		fatal "Could not mount read-write rootfs"
 	fi
 
