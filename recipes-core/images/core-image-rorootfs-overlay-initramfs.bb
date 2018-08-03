@@ -3,12 +3,20 @@ DESCRIPTION = "Small image capable of booting a device. The kernel includes \
 the Minimal RAM-based Initial Root Filesystem (initramfs), mounts the root fs \
 read only and uses a file system overlay for written data."
 
-PACKAGE_INSTALL = "initramfs-readonly-rootfs-overlay ${VIRTUAL-RUNTIME_base-utils} udev base-passwd ${ROOTFS_BOOTSTRAP_INSTALL}"
+INITRAMFS_SCRIPTS ?= "\
+                      initramfs-framework-base \
+                      initramfs-module-setup-live \
+                      initramfs-module-udev \
+                      initramfs-module-install \
+                      initramfs-module-install-efi \
+                     "
+
+PACKAGE_INSTALL = "initramfs-readonly-rootfs-overlay ${INITRAMFS_SCRIPTS} ${VIRTUAL-RUNTIME_base-utils} udev base-passwd ${ROOTFS_BOOTSTRAP_INSTALL}"
 
 # Do not pollute the initrd image with rootfs features
 IMAGE_FEATURES = ""
 
-export IMAGE_BASENAME = "core-image-readonly-rootfs-overlay-initramfs"
+export IMAGE_BASENAME = "${MLPREFIX}core-image-rorootfs-overlay-initramfs"
 IMAGE_LINGUAS = ""
 
 LICENSE = "MIT"
@@ -20,3 +28,6 @@ IMAGE_ROOTFS_SIZE = "8192"
 IMAGE_ROOTFS_EXTRA_SPACE = "0"
 
 BAD_RECOMMENDATIONS += "busybox-syslog"
+
+# Use the same restriction as initramfs-live-install
+COMPATIBLE_HOST = "(i.86|x86_64).*-linux"
