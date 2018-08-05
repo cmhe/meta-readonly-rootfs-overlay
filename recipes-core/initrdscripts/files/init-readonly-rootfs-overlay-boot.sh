@@ -91,7 +91,13 @@ mount_and_boot() {
 	# current root file system via bind mount.
 	ROOT_ROMOUNTPARAMS_BIND="-o ${ROOT_ROMOUNTOPTIONS} /"
 	if [ -n "${ROOT_RODEVICE}" ]; then
-		ROOT_ROMOUNTPARAMS="-o ${ROOT_ROMOUNTOPTIONS_DEVICE} $ROOT_RODEVICE"
+		ROOT_ROPARTUUID=$(echo ${ROOT_RODEVICE} | awk -F= '/PARTUUID/ {print $NF}')
+		if [ -n "${ROOT_ROPARTUUID}" ]; then
+			ROOT_ROMOUNTPARAMS="-o ${ROOT_ROMOUNTOPTIONS_DEVICE} $(blkid | awk -F: "/${ROOT_ROPARTUUID}/ { print \$1}")"
+		else
+			ROOT_ROMOUNTPARAMS="-o ${ROOT_ROMOUNTOPTIONS_DEVICE} $ROOT_RODEVICE"
+		fi
+
 		if [ -n "${ROOT_ROFSTYPE}" ]; then
 			ROOT_ROMOUNTPARAMS="-t $ROOT_ROFSTYPE $ROOT_ROMOUNTPARAMS"
 		fi
@@ -124,8 +130,13 @@ mount_and_boot() {
 	# If a read-write device was specified via kernel command line, use
 	# it, otherwise default to tmpfs.
 	if [ -n "${ROOT_RWDEVICE}" ]; then
-		
-		ROOT_RWMOUNTPARAMS="-o $ROOT_RWMOUNTOPTIONS_DEVICE $ROOT_RWDEVICE"
+		ROOT_RWPARTUUID=$(echo ${ROOT_RWDEVICE} | awk -F= '/PARTUUID/ {print $NF}')
+		if [ -n "${ROOT_RWPARTUUID}" ]; then
+			ROOT_RWMOUNTPARAMS="-o ${ROOT_RWMOUNTOPTIONS_DEVICE} $(blkid | awk -F: "/${ROOT_RWPARTUUID}/ { print \$1}")"
+		else
+			ROOT_RWMOUNTPARAMS="-o $ROOT_RWMOUNTOPTIONS_DEVICE $ROOT_RWDEVICE"
+		fi
+
 		if [ -n "${ROOT_RWFSTYPE}" ]; then
 			ROOT_RWMOUNTPARAMS="-t $ROOT_RWFSTYPE $ROOT_RWMOUNTPARAMS"
 		fi
