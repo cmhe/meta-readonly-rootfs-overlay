@@ -101,10 +101,7 @@ mount_and_boot() {
 
 	# Mount root file system to new mount-point, if unsuccessful, try bind
 	# mounting current root file system.
-	if ! $MOUNT $ROOT_ROMOUNTPARAMS "$ROOT_ROMOUNT" 2>/dev/null && \
-		[ "x$ROOT_ROMOUNTPARAMS_BIND" == "x$ROOT_ROMOUNTPARAMS" ] || \
-		log "Could not mount $ROOT_RODEVICE, bind mounting..." && \
-		! $MOUNT $ROOT_ROMOUNTPARAMS_BIND "$ROOT_ROMOUNT"; then
+	if ! $MOUNT $ROOT_ROMOUNTPARAMS "$ROOT_ROMOUNT" ; then
 		fatal "Could not mount read-only rootfs"
 	fi
 
