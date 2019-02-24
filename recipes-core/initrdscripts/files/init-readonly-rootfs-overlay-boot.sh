@@ -180,14 +180,8 @@ mount_and_boot() {
 	$MOUNT -n --move $ROOT_ROMOUNT ${ROOT_MOUNT}/$ROOT_ROMOUNT
 	$MOUNT -n --move $ROOT_RWMOUNT ${ROOT_MOUNT}/$ROOT_RWMOUNT
 
-	$MOUNT -n --move /proc ${ROOT_MOUNT}/proc
-	$MOUNT -n --move /sys ${ROOT_MOUNT}/sys
-	$MOUNT -n --move /dev ${ROOT_MOUNT}/dev
-
-	cd $ROOT_MOUNT
-
 	# switch to actual init in the overlay root file system
-	exec chroot $ROOT_MOUNT $INIT ||
+	exec switch_root $ROOT_MOUNT $INIT ||
 		fatal "Couldn't chroot, dropping to shell"
 }
 
