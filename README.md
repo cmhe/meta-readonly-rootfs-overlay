@@ -131,7 +131,7 @@ using this init script without an initrd, `init=/init` has to be set.
 root=/dev/sda1 rootrw=/dev/sda2 init=/init rootinit=/bin/sh
 ```
 
-The same as before but it now starts `/bin/sh` instead of `/sbin/init`
+The same as before but it now starts `/init` instead of `/sbin/init`
 
 ### Details
 
