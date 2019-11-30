@@ -41,13 +41,13 @@ This layer depends on:
 
 ```
   URI: git://git.openembedded.org/bitbake
-  branch: krogoth
+  branch: zeus
 ```
 
 ```
   URI: git://git.openembedded.org/openembedded-core
   layers: meta
-  branch: krogoth
+  branch: zeus
 ```
 
 # Patches
